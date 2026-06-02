@@ -1,0 +1,20 @@
+---
+# Pinned upstream version. Bump explicitly when you want to upgrade.
+openvpn_exporter_version: "v1.2.2"
+
+# Where the binary lives.
+openvpn_exporter_bin: "/usr/local/bin/openvpn-exporter"
+
+# systemd listen address. 127.0.0.1 = scrape from local Prometheus on the
+# same host only. Change to a LAN/VPN address only if you need cross-host
+# scraping.
+openvpn_exporter_listen: "127.0.0.1:9176"
+
+# status files to read. Override per-host in host_vars when multiple instances.
+# Default fits a single openvpn-server@1191 instance.
+openvpn_exporter_status_paths:
+  - "/run/openvpn-server/1191.status"
+
+# Pass --ignore.individuals to expose aggregated metrics only (no per-CN labels).
+# Set to true if you want to hide CN names from Prometheus.
+openvpn_exporter_ignore_individuals: false

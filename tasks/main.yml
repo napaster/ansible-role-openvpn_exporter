@@ -1,0 +1,76 @@
+---
+# Install natrontech/openvpn-exporter binary + systemd unit. Arch only.
+# Reads OpenVPN status file (no management TCP), exposes :9176 for local Prometheus.
+
+- name: 'openvpn_exporter | Assert OS is Archlinux'
+  ansible.builtin.assert:
+    that:
+      - "ansible_distribution == 'Archlinux'"
+    fail_msg: "openvpn_exporter currently supports only Arch Linux (binary from
+      natrontech/openvpn-exporter GitHub releases). Got {{ ansible_distribution }}."
+
+- name: 'openvpn_exporter | Check installed version'
+  ansible.builtin.command: "{{ openvpn_exporter_bin }} --version"
+  register: _openvpn_exporter_installed
+  failed_when: false
+  changed_when: false
+
+- name: 'openvpn_exporter | Download release tarball'
+  ansible.builtin.get_url:
+    url: "https://github.com/natrontech/openvpn-exporter/releases/download/{{ openvpn_exporter_version }}/openvpn-exporter_{{ openvpn_exporter_version }}_linux_amd64.tar.gz"
+    dest: "/tmp/openvpn-exporter_{{ openvpn_exporter_version }}_linux_amd64.tar.gz"
+    mode: '0644'
+  when: openvpn_exporter_version not in (_openvpn_exporter_installed.stdout | default(''))
+
+- name: 'openvpn_exporter | Extract tarball to staging'
+  ansible.builtin.unarchive:
+    src: "/tmp/openvpn-exporter_{{ openvpn_exporter_version }}_linux_amd64.tar.gz"
+    dest: "/tmp/"
+    remote_src: true
+    list_files: true
+  register: _openvpn_exporter_unpack
+  when: openvpn_exporter_version not in (_openvpn_exporter_installed.stdout | default(''))
+
+- name: 'openvpn_exporter | Install binary into /usr/local/bin'
+  ansible.builtin.copy:
+    src: "/tmp/openvpn-exporter-linux-amd64"
+    dest: "{{ openvpn_exporter_bin }}"
+    owner: root
+    group: root
+    mode: '0755'
+    remote_src: true
+  when: openvpn_exporter_version not in (_openvpn_exporter_installed.stdout | default(''))
+  notify: 'Restart openvpn-exporter'
+
+- name: 'openvpn_exporter | Cleanup extracted artefacts'
+  ansible.builtin.file:
+    path: "/tmp/{{ item }}"
+    state: absent
+  loop:
+    - openvpn-exporter-linux-amd64
+    - CHANGELOG.md
+    - LICENSE
+    - README.md
+
+- name: 'openvpn_exporter | Cleanup downloaded tarball'
+  ansible.builtin.file:
+    path: "/tmp/openvpn-exporter_{{ openvpn_exporter_version }}_linux_amd64.tar.gz"
+    state: absent
+
+- name: 'openvpn_exporter | Deploy systemd unit'
+  ansible.builtin.template:
+    src: 'openvpn-exporter.service.j2'
+    dest: '/etc/systemd/system/openvpn-exporter.service'
+    owner: root
+    group: root
+    mode: '0644'
+  notify:
+    - 'Reload systemd'
+    - 'Restart openvpn-exporter'
+
+- name: 'openvpn_exporter | Enable and start service'
+  ansible.builtin.systemd:
+    name: 'openvpn-exporter.service'
+    enabled: true
+    state: started
+    daemon_reload: true

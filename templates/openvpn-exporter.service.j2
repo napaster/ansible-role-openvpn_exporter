@@ -1,0 +1,28 @@
+[Unit]
+Description=Prometheus exporter for OpenVPN (natrontech/openvpn-exporter)
+Documentation=https://github.com/natrontech/openvpn-exporter
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Reads root-owned /run/openvpn-server/*.status — needs root.
+User=root
+Group=root
+ExecStart={{ openvpn_exporter_bin }} \
+  -openvpn.listen-address {{ openvpn_exporter_listen }} \
+  -openvpn.status-files {{ openvpn_exporter_status_paths | join(',') }} \
+  -openvpn.ignore-individuals {{ openvpn_exporter_ignore_individuals | bool | string | lower }}
+
+Restart=on-failure
+RestartSec=5s
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadOnlyPaths=/run/openvpn-server
+
+[Install]
+WantedBy=multi-user.target
